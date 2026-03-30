@@ -129,7 +129,7 @@ tr.selected td{background:#EEF5FD}
   <div class="topbar">
     <div class="topbar-left">
       <h1>Nederland ASU — TAR Management Tool</h1>
-      <div class="topbar-sub"><span class="live-dot offline-dot" id="live-dot"></span><span id="data-status">Nederland ASU — P6 Updates (29 Mar 2026)</span></div>
+      <div class="topbar-sub"><span class="live-dot offline-dot" id="live-dot"></span><span id="data-status">Nederland ASU — P6 Updates (30 Mar 2026)</span></div>
     </div>
     <span class="badge b-info" id="badge-acts">—</span>
     <span class="badge b-ok" id="badge-wos">—</span>
@@ -203,6 +203,7 @@ tr.selected td{background:#EEF5FD}
 
   <!-- RESOURCES -->
   <div class="panel" id="panel-resources">
+    <div class="fco-notice" id="fco-notice-resources">⚠ <strong>FCO scope active</strong> — showing Field Change Order activities only. Switch to <a href="#" onclick="setScope('combined');return false">Combined</a> to see both scopes together.</div>
     <div class="stat-row" id="res-stats"></div>
     <div class="filters">
       <input type="text" id="res-search" placeholder="Search resource..." oninput="filterRes()">
@@ -223,6 +224,7 @@ tr.selected td{background:#EEF5FD}
 
   <!-- RESOURCE LOADING HISTOGRAM -->
   <div class="panel" id="panel-reshistogram">
+    <div class="fco-notice" id="fco-notice-reshistogram">⚠ <strong>FCO scope active</strong> — showing Field Change Order activities only. Switch to <a href="#" onclick="setScope('combined');return false">Combined</a> to see both scopes together.</div>
     <div class="res-hist-controls">
       <div>
         <label>Resource</label>
@@ -257,6 +259,7 @@ tr.selected td{background:#EEF5FD}
 
   <!-- CRITICAL PATH -->
   <div class="panel" id="panel-critical">
+    <div class="fco-notice" id="fco-notice-critical">⚠ <strong>FCO scope active</strong> — showing Field Change Order activities only. Switch to <a href="#" onclick="setScope('combined');return false">Combined</a> to see both scopes together.</div>
     <div class="stat-row">
       <div class="stat"><div class="stat-label">Near-critical (≤3d)</div><div class="stat-val warning" id="cp-nc">—</div></div>
       <div class="stat"><div class="stat-label">Unresourced</div><div class="stat-val danger" id="cp-ur">—</div></div>
@@ -288,6 +291,7 @@ tr.selected td{background:#EEF5FD}
 
   <!-- S-CURVES -->
   <div class="panel" id="panel-scurve">
+    <div class="fco-notice" id="fco-notice-scurve">⚠ <strong>FCO scope active</strong> — showing Field Change Order activities only. Switch to <a href="#" onclick="setScope('combined');return false">Combined</a> to see both scopes together.</div>
     <div class="sc-selector">
       <button class="sc-btn active" data-sc="lh" onclick="selectSC('lh',this)">S-curve — manhours</button>
       <button class="sc-btn" data-sc="acts" onclick="selectSC('acts',this)">S-curve — activity completions</button>
@@ -329,6 +333,7 @@ tr.selected td{background:#EEF5FD}
 
   <!-- SETUP -->
   <div class="panel" id="panel-behind">
+    <div class="fco-notice" id="fco-notice-behind" style="display:none">⚠ <strong>FCO scope active</strong> — showing FCO activities only.</div>
     <div class="stat-row" id="behind-stats"></div>
     <div class="filters">
       <input type="text" id="behind-search" placeholder="Search activity or WO..." oninput="filterBehind()">
@@ -385,6 +390,30 @@ tr.selected td{background:#EEF5FD}
       </div>
       <div id="connect-status"></div>
     </div>
+    <div class="setup-card" id="fco-setup-card">
+      <h2>FCO scope — Connect to Google Sheets</h2>
+      <div style="font-size:13px;color:#555;margin-bottom:12px;line-height:1.6">
+        Connect to the <code>FCO P6 Updates</code> tab in your Google Sheet. This is a separate Apps Script deployment reading the FCO tab.<br>
+        The FCO scope is optional — the main tool works without it.
+      </div>
+      <div class="setup-step"><div class="step-num">1</div>
+        <div class="step-body">In your Apps Script project, create a new file <code>TARTool_FCO.gs</code> and paste the FCO script. Save.</div>
+      </div>
+      <div class="setup-step"><div class="step-num">2</div>
+        <div class="step-body"><strong>Deploy → New deployment</strong>. Web App · Execute as Me · Who has access: <strong>Anyone</strong>. Copy the URL.</div>
+      </div>
+      <div class="setup-step"><div class="step-num">3</div>
+        <div class="step-body">Paste the URL below and click Connect FCO. Once connected, use the scope toggle at the top to switch between Main, FCO and Combined views.</div>
+      </div>
+      <div style="margin-top:4px">
+        <label style="font-size:13px;font-weight:500">FCO Apps Script Web App URL</label>
+        <input type="text" class="url-input" id="fco-script-url" placeholder="https://script.google.com/macros/s/...">
+      </div>
+      <div style="margin-top:10px;display:flex;gap:10px">
+        <button class="btn-primary" style="background:#C47B1A" onclick="connectFCO()">Connect FCO / Refresh</button>
+        <button class="btn-sec" onclick="clearFCO()">Disconnect FCO</button>
+      </div>
+      <div id="fco-connect-status"></div>
     </div>
   </div>
 </div>
@@ -409,7 +438,7 @@ var activeScChart=null, activeHistChart=null, activeSC='lh';
 var histRange='tar';
 // Default Apps Script URL - baked in so tool auto-connects without Setup
 var DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz8kTqAwH_J_vZthY-nJabfjSxRF1TXpO-LFL6nJoEEX7Y3t4aQL_H2-Ep8mMN8SkVYDg/exec';
-var liveUrl = localStorage.getItem('tar_url') || DEFAULT_SCRIPT_URL;
+var liveUrl = DEFAULT_SCRIPT_URL || localStorage.getItem('tar_url') || '';
 var refreshTimer=null;
 var capMap={};  // resource name -> capacity
 
@@ -443,28 +472,38 @@ function calcHC(lh, durH){
   return Math.round(lh/durH*10)/10;
 }
 
-window.addEventListener('load',function(){
-  // Pre-fill URL field and auto-connect if URL is known
-  var scriptInput=document.getElementById('script-url');
-  if(liveUrl){
-    if(scriptInput) scriptInput.value=liveUrl;
-    fetchLive(liveUrl);
-  } else if(DEFAULT_SCRIPT_URL && scriptInput){
-    scriptInput.value=DEFAULT_SCRIPT_URL;
-  }
-  else loadData(offlinePayload());
-});
 
+
+
+
+window.addEventListener('load', function() {
+  // Always use DEFAULT_SCRIPT_URL - ensures correct script per tool
+  var connectUrl = DEFAULT_SCRIPT_URL || '';
+  var scriptInput = document.getElementById('script-url');
+  if (connectUrl) {
+    localStorage.setItem('tar_url', connectUrl);
+    liveUrl = connectUrl;
+    if (scriptInput) scriptInput.value = connectUrl;
+    fetchLive(connectUrl);
+  } else {
+    loadData(offlinePayload());
+  }
+  // FCO URL
+  var fcoInput = document.getElementById('fco-script-url');
+  if (fcoInput && typeof DEFAULT_FCO_URL !== 'undefined' && DEFAULT_FCO_URL) {
+    localStorage.setItem('tar_fco_url', DEFAULT_FCO_URL);
+    fcoInput.value = DEFAULT_FCO_URL;
+  }
+});
 function offlinePayload(){
   var wos=WO_RAW.map(function(w){
     var woActs=(ACTS_RAW[w[0]]||[]).map(function(a){
-      var durH=a[9]||parseDurH(a[5],a[7]);
-      return{id:a[0],name:a[1],plan_lh:a[2],actual_lh:a[10]||0,pct:a[11]||0,
+      var durH=parseDurH(a[5],a[7]);
+      return{id:a[0],name:a[1],plan_lh:a[2],actual_lh:0,pct:0,
              fd:a[3],fs:a[4],dur:a[5],dur_h:durH,
              hc:calcHC(a[2],durH),
              res:a[6]||[],start:a[7]||'',finish:a[8]||'',
-             bl_finish:a[13]||'',late_finish:a[14]||'',
-             status:a[12]||'',notes:'',wo_id:w[0],eq:w[2]};
+             status:'',notes:'',wo_id:w[0],eq:w[2]};
     });
     return{id:w[0],name:w[1],eq:w[2],ph:w[3],ac:w[4],
            plan_lh:w[5],actual_lh:0,mf:w[6],res:w[7],
@@ -512,14 +551,7 @@ function setStatus(type,msg){
 function loadData(payload){
   var wos=payload.wos; var scurve=payload.scurve;
   allWO=wos; ACT_INDEX={};
-  wos.forEach(function(wo){
-    // Enrich acts with headcount if coming from live (acts may not have dur_h)
-    (wo.acts||[]).forEach(function(a){
-      if(!a.dur_h) a.dur_h=parseDurH(a.dur,a.start);
-      if(!a.hc) a.hc=calcHC(a.plan_lh,a.dur_h);
-    });
-    ACT_INDEX[wo.id]=wo.acts||[];
-  });
+  wos.forEach(function(wo){ ACT_INDEX[wo.id]=wo.acts||[]; });
   allCP=[];
   wos.forEach(function(wo){
     (wo.acts||[]).forEach(function(a){
@@ -919,7 +951,7 @@ function renderResHistogram(){
         }
       }
     }
-  });
+    });
 }
 
 function showDayDetail(resName, dayStr){
@@ -933,8 +965,6 @@ function showDayDetail(resName, dayStr){
       if(a.start.slice(0,10)<=dayStr&&a.finish.slice(0,10)>=dayStr){
         matching.push({a:a,wo:wo});
       }
-    });
-  });
   matching.sort(function(x,y){return(x.a.fd==null?999:x.a.fd)-(y.a.fd==null?999:y.a.fd);});
   var totalHC=matching.reduce(function(s,x){return s+(x.a.hc||0);},0);
   var rows=matching.map(function(x){
@@ -964,6 +994,8 @@ function showDayDetail(resName, dayStr){
         '<tbody>'+rows+'</tbody></table>'+
       '</div>'+
     '</div></div>';
+    });
+    });
 }
 
 // ---- Critical Path ----
@@ -1022,8 +1054,8 @@ var SC_CFG={
         sub:'Cumulative activity count · 🔵 Early finish · ⬛ Baseline · 🔴 Late finish · 🟢 Actual',
         legend:[{c:'#E24B4A',l:'Late finish'},{c:'#1E3A5F',l:'Baseline'},{c:'#378ADD',l:'Early finish'},{c:'#1D9E75',l:'Actual'}],
         three_curve:true, field:'acts'},
-  cp:{title:'Critical path S-curve — early / baseline / late / actual',
-      sub:'Near-critical activities (≤3d float) · 🔵 Early · ⬛ Baseline · 🔴 Late · 🟢 Actual',
+  cp:{title:'Critical path S-curve — manhours (early / baseline / late / actual)',
+      sub:'Near-critical (≤3d float) cumulative manhours · 🔵 Early · ⬛ Baseline · 🔴 Late · 🟢 Actual',
       legend:[{c:'#E24B4A',l:'Late finish'},{c:'#1E3A5F',l:'Baseline'},{c:'#378ADD',l:'Early finish'},{c:'#1D9E75',l:'Actual'}],
       three_curve:true, field:'cp'},
   cp_acts:{title:'Critical path S-curve — activities (early / baseline / late / actual)',
@@ -1067,7 +1099,6 @@ function computeLiveCharts(){
       var f=a.finish.slice(0,10);
       if(!maxFinish||f>maxFinish) maxFinish=f;
     }
-  });
   var overallStart=minStart||'2026-04-13';
   var overallEnd=maxFinish||'2026-07-03';
 
@@ -1099,7 +1130,7 @@ function computeLiveCharts(){
     var sd=a.start?a.start.slice(0,10):'';
     var fd=a.finish?a.finish.slice(0,10):'';
     if(!sd||!fd) return;
-    // Clamp finish to start if inverted
+    // Clamp finish to start if inverted (schedule revision artefact)
     if(fd<sd) fd=sd;
 
     // Planned activity count uses BL finish (original baseline date)
@@ -1260,8 +1291,6 @@ function computeLiveCharts(){
         }
         cur.setTime(cur.getTime()+3600000); // +1 hour
       }
-    });
-  });
   // Convert hourly to daily peak
   var liveHist={};
   Object.keys(liveHourly).forEach(function(r){
@@ -1279,14 +1308,17 @@ function computeLiveCharts(){
     window.liveResHist[r]=Object.keys(liveHist[r]).sort().map(function(dk){
       return{date:dk,hc:Math.round(liveHist[r][dk]*10)/10};
     });
-  });
   // Also update RES_HIST reference so offline histogram tab uses same data
   window.activeResHist=window.liveResHist;
 
   // Update peak headcount in RES_DATA
   RES_DATA.forEach(function(r){
 
-  });
+    });
+    });
+    });
+    });
+    });
 }
 
 function buildDayList(startStr,endStr){
@@ -1424,7 +1456,7 @@ function renderThreeCurve(cfg, pts, eqFilter){
       },
       interaction:{mode:'index',intersect:false}
     }
-  });
+    });
 }
 
 
@@ -1434,14 +1466,12 @@ function renderThreeCurve(cfg, pts, eqFilter){
 var activeScope = 'main'; // 'main' | 'fco' | 'combined'
 var fcoWO = [];
 var fcoChartPoints = null;
-var fcoLiveUrl = localStorage.getItem('tar_fco_url') || '';
+var DEFAULT_FCO_URL = 'https://script.google.com/macros/s/AKfycbyvDtercNp-8RoypxMbH4MYWC5g5r7SKvMZDXZ5XmEbK3KsQmxPiw8qxkB7zN6XLHMV/exec';
+var fcoLiveUrl = localStorage.getItem('tar_fco_url') || DEFAULT_FCO_URL;
 var fcoRefreshTimer = null;
 
 // On load, restore FCO URL and try to connect if available
-window.addEventListener('load', function(){
-  var fcoUrlEl = document.getElementById('fco-script-url');
-  if(fcoUrlEl && fcoLiveUrl) fcoUrlEl.value = fcoLiveUrl;
-});
+
 
 function setScope(scope) {
   activeScope = scope;
@@ -1533,7 +1563,6 @@ function checkFCOConflicts() {
     (wo.acts||[]).forEach(function(a){
       if(a.fd!=null&&a.fd<=3) mainCP.push(a);
     });
-  });
   var conflicts = [];
   fcoWO.forEach(function(wo){
     (wo.acts||[]).forEach(function(a){
@@ -1544,9 +1573,6 @@ function checkFCOConflicts() {
         if(clashing.length) {
           conflicts.push({fco_act:a.id, fco_name:a.name, res:r, cp_count:clashing.length});
         }
-      });
-    });
-  });
   // Show conflict warning on critical path tab
   var cpPanel = document.querySelector('#panel-critical');
   var existingWarn = document.getElementById('fco-conflict-warn');
@@ -1558,6 +1584,10 @@ function checkFCOConflicts() {
     div.innerHTML = '⚠ <strong>'+conflicts.length+' FCO resource conflict'+(conflicts.length>1?'s':'')+'</strong> — FCO activities share resources with near-critical main scope activities. Review FCO scheduling to protect the critical path.';
     cpPanel.insertBefore(div, cpPanel.children[1]);
   }
+    });
+    });
+    });
+    });
 }
 
 // ============================================================
@@ -1621,7 +1651,6 @@ function loadFCOData(data) {
       if(!a.dur_h) a.dur_h = parseDurH(a.dur, a.start);
       if(!a.hc) a.hc = calcHC(a.plan_lh, a.dur_h);
     });
-  });
   // Build FCO chart points
   if(data.scurve && data.scurve.points) {
     fcoChartPoints = data.scurve.points;
@@ -1641,6 +1670,7 @@ function loadFCOData(data) {
     document.querySelector('.topbar').insertBefore(badge, document.getElementById('badge-ur').nextSibling);
   }
   badge.textContent = fcoWO.length+' FCO WOs';
+    });
 }
 
 function clearFCO() {
@@ -1731,7 +1761,7 @@ function renderCombinedSCurve(){
       },
       interaction:{mode:'index',intersect:false}
     }
-  });
+    });
 }
 
 
@@ -1943,11 +1973,11 @@ function buildBehindData() {
         });
       } catch(e) {}
     });
-  });
 
   // Sort by slip_days desc by default
   behind.sort(function(a,b){ return b.slip_days - a.slip_days; });
   return behind;
+    });
 }
 
 function initBehindFilters(data) {
@@ -2114,6 +2144,7 @@ function computeFilteredSC(eqFilter){
     var isCP=a.fd!=null&&a.fd<=3;
 
     // Distribute LH across date range
+});
     function distLH(byDay,s,f,v){
       if(!s||!f||!v) return;
       try{
@@ -2146,7 +2177,6 @@ function computeFilteredSC(eqFilter){
       if(lFd2&&cpL.hasOwnProperty(lFd2))  cpL[lFd2]++;
       if(actFd&&cpA.hasOwnProperty(actFd)) cpA[actFd]++;
     }
-  });
 
   // Cumulate
   function cumulate(byDay){
@@ -2168,6 +2198,7 @@ function computeFilteredSC(eqFilter){
     };
   });
 }
+
 function buildSCStats(){
   var scEq=document.getElementById('sc-eq-filter');
   var eqFilter=scEq?scEq.value:'';
@@ -2240,6 +2271,7 @@ function renderSC(key){
     var selectedDate2=getProgressDate();
     var planHist=pts.map(function(p){return p.hist||0;});
     var actHist=pts.map(function(p){return p.actual_hist||0;});
+    // Grey out plan bars after selected date
     var planColors=pts.map(function(p){return p.date<=selectedDate2?'rgba(55,138,221,.6)':'rgba(200,200,200,.3)';});
     var actColors=pts.map(function(p){return p.date<=selectedDate2?'rgba(29,158,117,.8)':'rgba(200,200,200,.3)';});
     var rolling=pts.map(function(_,i){
@@ -2303,7 +2335,7 @@ function clearLive(){
   if(refreshTimer)clearInterval(refreshTimer);
   document.getElementById('script-url').value='';
   document.getElementById('connect-status').innerHTML='<div class="status-bar ok">Disconnected.</div>';
-  setStatus('offline','Nederland ASU — P6 Updates (29 Mar 2026)');
+  setStatus('offline','Nederland ASU — P6 Updates (30 Mar 2026)');
   loadData(offlinePayload());
 }
 function switchTab(name,btn){
