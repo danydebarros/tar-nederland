@@ -707,7 +707,7 @@ var activeScChart=null, activeHistChart=null, activeSC='lh';
 var histRange='tar';
 // Default Apps Script URL - baked in so tool auto-connects without Setup
 var DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz8kTqAwH_J_vZthY-nJabfjSxRF1TXpO-LFL6nJoEEX7Y3t4aQL_H2-Ep8mMN8SkVYDg/exec';
-var liveUrl = localStorage.getItem('tar_ned_url') || DEFAULT_SCRIPT_URL;
+var liveUrl = localStorage.getItem('tar_ned_url') || '';
 var refreshTimer=null;
 var capMap={};  // resource name -> capacity
 
@@ -742,16 +742,15 @@ function calcHC(lh, durH){
 }
 
 window.addEventListener('load',function(){
-  // Pre-fill main URL and auto-connect
+  // Always load offline data first — shows correct Nederland data immediately
+  loadData(offlinePayload());
+  // Pre-fill URL input
   var scriptInput=document.getElementById('script-url');
-  if(liveUrl){
-    if(scriptInput) scriptInput.value=liveUrl;
-    fetchLive(liveUrl);
-  } else if(DEFAULT_SCRIPT_URL && scriptInput){
-    scriptInput.value=DEFAULT_SCRIPT_URL;
-    fetchLive(DEFAULT_SCRIPT_URL);
-  } else {
-    loadData(offlinePayload());
+  var connectUrl=liveUrl||DEFAULT_SCRIPT_URL||'';
+  if(scriptInput) scriptInput.value=connectUrl;
+  // Then connect live in background
+  if(connectUrl){
+    setTimeout(function(){ fetchLive(connectUrl); }, 800);
   }
   // Pre-fill FCO URL field
   var fcoInput=document.getElementById('fco-script-url');
