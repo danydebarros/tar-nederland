@@ -707,7 +707,7 @@ var activeScChart=null, activeHistChart=null, activeSC='lh';
 var histRange='tar';
 // Default Apps Script URL - baked in so tool auto-connects without Setup
 var DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz8kTqAwH_J_vZthY-nJabfjSxRF1TXpO-LFL6nJoEEX7Y3t4aQL_H2-Ep8mMN8SkVYDg/exec';
-var liveUrl = localStorage.getItem('tar_url') || DEFAULT_SCRIPT_URL;
+var liveUrl = localStorage.getItem('tar_ned_url') || DEFAULT_SCRIPT_URL;
 var refreshTimer=null;
 var capMap={};  // resource name -> capacity
 
@@ -756,7 +756,7 @@ window.addEventListener('load',function(){
   // Pre-fill FCO URL field
   var fcoInput=document.getElementById('fco-script-url');
   if(fcoInput){
-    var storedFco=localStorage.getItem('tar_fco_url')||'';
+    var storedFco=localStorage.getItem('tar_ned_fco_url')||'';
     var defaultFco=typeof DEFAULT_FCO_URL!=='undefined'?DEFAULT_FCO_URL:'';
     fcoInput.value=storedFco||defaultFco;
   }
@@ -1747,7 +1747,7 @@ var activeScope = 'main'; // 'main' | 'fco' | 'combined'
 var fcoWO = [];
 var fcoChartPoints = null;
 var DEFAULT_FCO_URL    = '';
-var fcoLiveUrl = localStorage.getItem('tar_fco_url') || DEFAULT_FCO_URL;
+var fcoLiveUrl = localStorage.getItem('tar_ned_fco_url') || DEFAULT_FCO_URL;
 var fcoRefreshTimer = null;
 
 // On load, restore FCO URL and try to connect if available
@@ -1888,7 +1888,7 @@ function connectFCO() {
       document.getElementById('fco-connect-status').innerHTML = '<div class="status-bar err">'+err+'</div>';
       return;
     }
-    localStorage.setItem('tar_fco_url', url);
+    localStorage.setItem('tar_ned_fco_url', url);
     fcoLiveUrl = url;
     loadFCOData(data);
     document.getElementById('fco-connect-status').innerHTML = '<div class="status-bar ok">FCO connected — '+(data.total_acts||0)+' activities loaded.</div>';
@@ -1957,7 +1957,7 @@ function loadFCOData(data) {
 }
 
 function clearFCO() {
-  localStorage.removeItem('tar_fco_url');
+  localStorage.removeItem('tar_ned_fco_url');
   fcoLiveUrl = ''; fcoWO = []; fcoChartPoints = null;
   if(fcoRefreshTimer) clearInterval(fcoRefreshTimer);
   document.getElementById('fco-script-url').value = '';
@@ -2595,7 +2595,7 @@ function connectLive(){
     document.getElementById('connect-status').innerHTML='<div class="status-bar err">Please enter a valid Apps Script URL.</div>';return;
   }
   document.getElementById('connect-status').innerHTML='<div class="status-bar loading">Connecting… this may take 20-40 seconds for large datasets. Please wait.</div>';
-  localStorage.setItem('tar_url',url); liveUrl=url;
+  localStorage.setItem('tar_ned_url',url); liveUrl=url;
   var cbName='_tarConnect'+Date.now();
   var script=document.createElement('script');
   var done=false;
@@ -2620,7 +2620,7 @@ function connectLive(){
   document.body.appendChild(script);
 }
 function clearLive(){
-  localStorage.removeItem('tar_url');liveUrl='';
+  localStorage.removeItem('tar_ned_url');liveUrl='';
   if(refreshTimer)clearInterval(refreshTimer);
   document.getElementById('script-url').value='';
   document.getElementById('connect-status').innerHTML='<div class="status-bar ok">Disconnected.</div>';
