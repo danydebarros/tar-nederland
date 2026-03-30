@@ -477,16 +477,17 @@ function calcHC(lh, durH){
 
 
 window.addEventListener('load', function() {
-  // Always use DEFAULT_SCRIPT_URL - ensures correct script per tool
+  // Load offline data FIRST so page renders immediately
+  loadData(offlinePayload());
+  // Then set up live connection in background
   var connectUrl = DEFAULT_SCRIPT_URL || '';
   var scriptInput = document.getElementById('script-url');
   if (connectUrl) {
     localStorage.setItem('tar_url', connectUrl);
     liveUrl = connectUrl;
     if (scriptInput) scriptInput.value = connectUrl;
-    fetchLive(connectUrl);
-  } else {
-    loadData(offlinePayload());
+    // Slight delay so offline data renders first
+    setTimeout(function() { fetchLive(connectUrl); }, 500);
   }
   // FCO URL
   var fcoInput = document.getElementById('fco-script-url');
