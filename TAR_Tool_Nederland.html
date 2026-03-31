@@ -781,33 +781,8 @@ function offlinePayload(){
 }
 
 function fetchLive(url){
-  setStatus('loading','Fetching live data… (may take 20-40 seconds for large datasets)');
-  // JSONP with cache-bust timestamp
-  var cbName='_tarCb'+Date.now();
-  var script=document.createElement('script');
-  var done=false;
-  var timeout=setTimeout(function(){
-    if(done)return; done=true;
-    delete window[cbName]; try{document.body.removeChild(script);}catch(e){}
-    setStatus('offline','Timed out — using offline data'); loadData(offlinePayload());
-  },60000);
-  window[cbName]=function(data){
-    if(done)return; done=true;
-    clearTimeout(timeout); delete window[cbName];
-    try{document.body.removeChild(script);}catch(e){}
-    if(data.error){setStatus('offline','Sheet error: '+data.error);loadData(offlinePayload());return;}
-    loadData(data);
-    setStatus('live','Live — updated '+new Date().toLocaleTimeString());
-    if(refreshTimer)clearInterval(refreshTimer); // auto-refresh disabled for Nederland
-  };
-  script.onerror=function(){
-    if(done)return; done=true; clearTimeout(timeout); delete window[cbName];
-    setStatus('offline','Could not reach Google Sheet — using offline data');
-    loadData(offlinePayload());
-  };
-  var sep=url.indexOf('?')>=0?'&':'?';
-  script.src=url+sep+'callback='+cbName+'&_='+Date.now();
-  document.body.appendChild(script);
+  // DISABLED — Apps Script returns stale data. Offline baseline is authoritative.
+  return;
 }
 
 function setStatus(type,msg){
@@ -848,8 +823,16 @@ function loadData(payload){
   document.getElementById('badge-nc').textContent=nc+' near-critical';
   document.getElementById('badge-ur').textContent=ur+' unresourced';
 
-  // Build all charts from live activity data
-  computeLiveCharts();
+  // Use pre-computed scurve+meta from Apps Script if available
+  // This avoids computeLiveCharts() which produces wrong totals
+  if(scurve && scurve.length > 0){
+    window.chartPoints = scurve;
+    if(payload.meta){
+      window.liveMeta = payload.meta;
+    }
+  } else {
+    computeLiveCharts();
+  }
   initProgressDates();
   buildSCStats(); renderSC(activeSC); updateSCPctComplete(activeSC);
   renderResHistogram();
@@ -2623,7 +2606,7 @@ function clearLive(){
   if(refreshTimer)clearInterval(refreshTimer);
   document.getElementById('script-url').value='';
   document.getElementById('connect-status').innerHTML='<div class="status-bar ok">Disconnected.</div>';
-  setStatus('offline','Nederland ASU — P6 Updates (30 Mar 2026)');
+  setStatus('offline','Nederland ASU — P6 baseline (30 Mar 2026) · Live connect disabled');
   loadData(offlinePayload());
 }
 function switchTab(name,btn){
