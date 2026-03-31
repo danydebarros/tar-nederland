@@ -764,15 +764,19 @@ window.addEventListener('load',function(){
 function offlinePayload(){
   var wos=WO_RAW.map(function(w){
     var woActs=(ACTS_RAW[w[0]]||[]).map(function(a){
-      var durH=parseDurH(a[5],a[7]);
-      return{id:a[0],name:a[1],plan_lh:a[2],actual_lh:0,pct:0,
+      // 15-field format: [id,name,plan_lh,fd,fs,dur,res[],start,finish,dur_h,actual_lh,pct,status,bl_finish,late_finish]
+      var durH=a[9]||parseDurH(a[5],a[7]);
+      var alh=a[10]||0;
+      return{id:a[0],name:a[1],plan_lh:a[2],actual_lh:alh,pct:a[11]||0,
              fd:a[3],fs:a[4],dur:a[5],dur_h:durH,
              hc:calcHC(a[2],durH),
              res:a[6]||[],start:a[7]||'',finish:a[8]||'',
-             status:'',notes:'',wo_id:w[0],eq:w[2]};
+             bl_finish:a[13]||'',late_finish:a[14]||'',
+             status:a[12]||'',notes:'',wo_id:w[0],eq:w[2]};
     });
+    var act_lh=woActs.reduce(function(s,a){return s+(a.actual_lh||0);},0);
     return{id:w[0],name:w[1],eq:w[2],ph:w[3],ac:w[4],
-           plan_lh:w[5],actual_lh:0,mf:w[6],res:w[7],
+           plan_lh:w[5],actual_lh:act_lh,mf:w[6],res:w[7],
            start:w[8],finish:w[9],acts:woActs};
   });
   return{wos:wos,scurve:null};
