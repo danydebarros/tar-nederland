@@ -748,10 +748,8 @@ window.addEventListener('load',function(){
   var scriptInput=document.getElementById('script-url');
   var connectUrl=liveUrl||DEFAULT_SCRIPT_URL||'';
   if(scriptInput) scriptInput.value=connectUrl;
-  // Then connect live in background
-  if(connectUrl){
-    setTimeout(function(){ fetchLive(connectUrl); }, 800);
-  }
+  // No auto-connect — user clicks Connect live data manually
+  // (auto-connect was overwriting correct offline baseline with old Apps Script data)
   // Pre-fill FCO URL field
   var fcoInput=document.getElementById('fco-script-url');
   if(fcoInput){
@@ -800,8 +798,7 @@ function fetchLive(url){
     if(data.error){setStatus('offline','Sheet error: '+data.error);loadData(offlinePayload());return;}
     loadData(data);
     setStatus('live','Live — updated '+new Date().toLocaleTimeString());
-    if(refreshTimer)clearInterval(refreshTimer);
-    refreshTimer=setInterval(function(){fetchLive(url);},5*60*1000);
+    if(refreshTimer)clearInterval(refreshTimer); // auto-refresh disabled for Nederland
   };
   script.onerror=function(){
     if(done)return; done=true; clearTimeout(timeout); delete window[cbName];
@@ -2611,8 +2608,7 @@ function connectLive(){
     if(data.error){document.getElementById('connect-status').innerHTML='<div class="status-bar err">Sheet error: '+data.error+'</div>';return;}
     loadData(data);setStatus('live','Live — updated '+new Date().toLocaleTimeString());
     document.getElementById('connect-status').innerHTML='<div class="status-bar ok">Connected — '+(data.total_acts||0).toLocaleString()+' activities loaded. Auto-refreshes every 5 minutes.</div>';
-    if(refreshTimer)clearInterval(refreshTimer);
-    refreshTimer=setInterval(function(){fetchLive(url);},5*60*1000);
+    if(refreshTimer)clearInterval(refreshTimer); // auto-refresh disabled for Nederland
   };
   script.onerror=function(){
     if(done)return;done=true;clearTimeout(timeout);delete window[cbName];
