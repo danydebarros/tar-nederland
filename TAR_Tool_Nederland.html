@@ -706,7 +706,7 @@ var woPage=0; var WPS=50;
 var activeScChart=null, activeHistChart=null, activeSC='lh';
 var histRange='tar';
 // Default Apps Script URL - baked in so tool auto-connects without Setup
-var DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz8kTqAwH_J_vZthY-nJabfjSxRF1TXpO-LFL6nJoEEX7Y3t4aQL_H2-Ep8mMN8SkVYDg/exec';
+var DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2AX6g5EwYYsxwIiQkK_w96qB-cY24T2GJThP6x138bj8bpNGRFuxr-WTjIvnv5sdibA/exec';
 var liveUrl = localStorage.getItem('tar_ned_url') || '';
 var refreshTimer=null;
 var capMap={};  // resource name -> capacity
@@ -791,10 +791,41 @@ function setStatus(type,msg){
 }
 
 function loadData(payload){
-  var wos=payload.wos; var scurve=payload.scurve;
+  // Handle two payload formats:
+  // 1. New format: {actuals: {actId: {...}}, ...} - merge into embedded baseline
+  // 2. Old format: {wos: [...], scurve: [...]} - use directly
+  var scurve = payload.scurve || null;
+
+  if(payload.actuals){
+    // NEW FORMAT: merge live actuals into embedded WO_RAW baseline
+    var actuals = payload.actuals;
+    var wos = offlinePayload().wos;
+    wos.forEach(function(wo){
+      wo.actual_lh = 0;
+      (wo.acts||[]).forEach(function(a){
+        var live = actuals[a.id];
+        if(live){
+          a.actual_lh   = live.actual_lh || 0;
+          a.pct         = live.pct || 0;
+          a.status      = live.status || '';
+          a.start       = live.act_start || a.start;
+          if(live.act_finish) a.finish = live.act_finish;
+          if(live.early_finish) a.finish = live.act_finish || (live.early_finish+'T08:00');
+          if(live.late_finish) a.late_finish = live.late_finish;
+          if(live.fd !== null && live.fd !== undefined) a.fd = live.fd;
+          if(live.res && live.res.length) a.res = live.res;
+        }
+        wo.actual_lh += (a.actual_lh||0);
+      });
+      wo.actual_lh = Math.round(wo.actual_lh);
+    });
+    payload = {wos: wos, scurve: null};
+    scurve = null;
+  }
+
+  var wos=payload.wos;
   allWO=wos; mainWO=wos; ACT_INDEX={};
   wos.forEach(function(wo){
-    // Enrich acts with headcount if coming from live (acts may not have dur_h)
     (wo.acts||[]).forEach(function(a){
       if(!a.dur_h) a.dur_h=parseDurH(a.dur,a.start);
       if(!a.hc) a.hc=calcHC(a.plan_lh,a.dur_h);
@@ -823,16 +854,9 @@ function loadData(payload){
   document.getElementById('badge-nc').textContent=nc+' near-critical';
   document.getElementById('badge-ur').textContent=ur+' unresourced';
 
-  // Use pre-computed scurve+meta from Apps Script if available
-  // This avoids computeLiveCharts() which produces wrong totals
-  if(scurve && scurve.length > 0){
-    window.chartPoints = scurve;
-    if(payload.meta){
-      window.liveMeta = payload.meta;
-    }
-  } else {
-    computeLiveCharts();
-  }
+  // Always recompute charts from merged WO data
+  // (actuals-only payload has no pre-computed scurve)
+  computeLiveCharts();
   initProgressDates();
   buildSCStats(); renderSC(activeSC); updateSCPctComplete(activeSC);
   renderResHistogram();
