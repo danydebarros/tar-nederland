@@ -3265,7 +3265,10 @@ function ganttComputeSchedule(group) {
   var prevComplete = true; // first WO has no predecessor — treat as complete
 
   wos.forEach(function(wo) {
-    var dur = ganttWorkDays(wo.bl_start, wo.bl_finish);
+    // Use plan hours to derive duration — more accurate than bl_finish - bl_start
+    // TAR runs 12h shifts; minimum 1 day
+    var SHIFT_H = 12;
+    var dur = wo.plan_lh ? Math.ceil(wo.plan_lh / SHIFT_H) : ganttWorkDays(wo.bl_start, wo.bl_finish);
     if(dur < 1) dur = 1;
     var fStart, fFinish, pushed = false, notStarted = false;
     var woComplete = (wo.pct >= 100);
