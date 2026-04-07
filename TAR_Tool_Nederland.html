@@ -771,14 +771,16 @@ function calcHC(lh, durH){
 }
 
 window.addEventListener('load',function(){
-  // Always load offline data first — shows correct Nederland data immediately
+  // Load offline data first so page renders immediately
   loadData(offlinePayload());
   // Pre-fill URL input
   var scriptInput=document.getElementById('script-url');
   var connectUrl=liveUrl||DEFAULT_SCRIPT_URL||'';
   if(scriptInput) scriptInput.value=connectUrl;
-  // No auto-connect — user clicks Connect live data manually
-  // (auto-connect was overwriting correct offline baseline with old Apps Script data)
+  // Auto-connect to live data
+  if(connectUrl){
+    fetchLive(connectUrl);
+  }
   // Pre-fill FCO URL field
   var fcoInput=document.getElementById('fco-script-url');
   if(fcoInput){
