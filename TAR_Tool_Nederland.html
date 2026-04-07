@@ -923,6 +923,21 @@ function loadData(payload){
   // Always recompute charts from merged WO data
   // (actuals-only payload has no pre-computed scurve)
   computeLiveCharts();
+  // Update Gantt WO lookup with live pct and actual_start
+  if(typeof ganttWOLookup !== 'undefined'){
+    wos.forEach(function(wo){
+      if(ganttWOLookup[wo.id]){
+        ganttWOLookup[wo.id].pct = wo.actual_lh > 0 ? Math.round(wo.actual_lh / wo.plan_lh * 100) : 0;
+        // Find actual start from acts
+        var actStart = '';
+        (wo.acts||[]).forEach(function(a){
+          if(a.start && a.actual_lh > 0 && (!actStart || a.start < actStart)) actStart = a.start.substring(0,10);
+        });
+        if(actStart) ganttWOLookup[wo.id].actual_start = actStart;
+        ganttWOLookup[wo.id].actual_lh = wo.actual_lh || 0;
+      }
+    });
+  }
   initProgressDates();
   buildSCStats(); renderSC(activeSC); updateSCPctComplete(activeSC);
   renderResHistogram();
@@ -2881,7 +2896,7 @@ function renderGantt(){
   var dpr   = window.devicePixelRatio||1;
   var cssW  = wrap.clientWidth||900;
 
-  var TAR_S = '2026-02-02', TAR_E = '2026-05-01';
+  var TAR_S = '2026-04-01', TAR_E = '2026-05-15';
   var startD = new Date(TAR_S+'T00:00:00');
   var endD   = new Date(TAR_E+'T00:00:00');
   var totalDays = (endD-startD)/(864e5);
@@ -3264,19 +3279,44 @@ function ganttComputeSchedule(group) {
   var prevForecastFinish = null;
   var prevComplete = true; // first WO has no predecessor — treat as complete
 
+  var excludeScaffold = document.getElementById('gantt-exclude-scaffold') &&
+                         document.getElementById('gantt-exclude-scaffold').checked;
+
   wos.forEach(function(wo) {
+    // If excluding scaffold removal, recalculate plan_lh and bl_finish
+    // by removing scaffold removal activities from the WO
+    var planLH = wo.plan_lh;
+    var blFinish = wo.bl_finish;
+    if(excludeScaffold && ACTS_RAW && ACTS_RAW[wo.id]){
+      var filteredActs = ACTS_RAW[wo.id].filter(function(a){
+        var name = (a[1]||'').toUpperCase();
+        return !(name.indexOf('SCAFFOLD') >= 0 &&
+                (name.indexOf('REMOV') >= 0 || name.indexOf('DISMANTLE') >= 0 || name.indexOf('DEMOB') >= 0));
+      });
+      if(filteredActs.length > 0){
+        planLH = filteredActs.reduce(function(s,a){return s+(a[2]||0);}, 0);
+        // Use latest finish of non-scaffold acts as the WO finish
+        var latestFinish = filteredActs.reduce(function(m,a){
+          var f = a[13] || (a[8]?a[8].substring(0,10):'');
+          return f > m ? f : m;
+        }, '');
+        if(latestFinish) blFinish = latestFinish;
+      }
+    }
     // Use plan hours to derive duration — more accurate than bl_finish - bl_start
     // TAR runs 12h shifts; minimum 1 day
     var SHIFT_H = 12;
-    var dur = wo.plan_lh ? Math.ceil(wo.plan_lh / SHIFT_H) : ganttWorkDays(wo.bl_start, wo.bl_finish);
+    var dur = planLH ? Math.ceil(planLH / SHIFT_H) : ganttWorkDays(wo.bl_start, blFinish);
     if(dur < 1) dur = 1;
     var fStart, fFinish, pushed = false, notStarted = false;
     var woComplete = (wo.pct >= 100);
-    var woStarted  = !!(wo.actual_start) || (wo.pct > 0);
+    // Started if has actual_start, or pct>0 (use bl_start as proxy for actual start)
+    var actualStart = wo.actual_start || (wo.pct > 0 ? wo.bl_start : '');
+    var woStarted  = !!(actualStart);
 
-    if (woStarted && wo.actual_start) {
-      // Has an actual start date — anchor to it, project finish by duration
-      fStart  = wo.actual_start;
+    if (woStarted && actualStart) {
+      // Has started — anchor to actual start, project finish by duration
+      fStart  = actualStart;
       fFinish = ganttAddDays(fStart, dur);
 
     } else if (!woStarted && prevComplete) {
@@ -3303,7 +3343,7 @@ function ganttComputeSchedule(group) {
     } else {
       // On schedule — use baseline dates
       fStart  = wo.bl_start;
-      fFinish = wo.bl_finish;
+      fFinish = blFinish || wo.bl_finish;
     }
 
     forecasts[wo.id] = { start: fStart, finish: fFinish, pushed: pushed, notStarted: notStarted, dur: dur };
