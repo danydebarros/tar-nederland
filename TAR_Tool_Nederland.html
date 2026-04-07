@@ -810,8 +810,32 @@ function offlinePayload(){
 }
 
 function fetchLive(url){
-  // DISABLED — Apps Script returns stale data. Offline baseline is authoritative.
-  return;
+  setStatus('loading','Fetching live data… (may take 20-40 seconds)');
+  var cbName='_tarCb'+Date.now();
+  var script=document.createElement('script');
+  var done=false;
+  var timeout=setTimeout(function(){
+    if(done)return; done=true;
+    delete window[cbName]; try{document.body.removeChild(script);}catch(e){}
+    setStatus('offline','Timed out — using offline data');
+  },60000);
+  window[cbName]=function(data){
+    if(done)return; done=true;
+    clearTimeout(timeout); delete window[cbName];
+    try{document.body.removeChild(script);}catch(e){}
+    if(data.error){setStatus('offline','Error: '+data.error); return;}
+    loadData(data);
+    setStatus('live','Live — updated '+new Date().toLocaleTimeString());
+    if(refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(function(){ fetchLive(url); }, 5*60*1000);
+  };
+  script.onerror=function(){
+    if(done)return; done=true; clearTimeout(timeout); delete window[cbName];
+    setStatus('offline','Could not reach Apps Script — using offline data');
+  };
+  var sep=url.indexOf('?')>=0?'&':'?';
+  script.src=url+sep+'callback='+cbName+'&_='+Date.now();
+  document.body.appendChild(script);
 }
 
 function setStatus(type,msg){
