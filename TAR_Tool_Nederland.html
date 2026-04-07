@@ -2978,7 +2978,7 @@ function renderGantt(){
       // Group aggregate: min actual_start → max bl_finish across filtered WOs
       var filteredWOs=row.wos;
       var woDates=filteredWOs.map(function(wid){return ganttWOLookup[wid];}).filter(Boolean);
-      var minBLS=null,maxBLF=null,minActS=null;
+      var minBLS=null,maxBLF=null,minActS=null,maxFcF=null;
       var totalPlan=0,totalActual=0;
       woDates.forEach(function(wo){
         if(wo.bl_start&&(!minBLS||wo.bl_start<minBLS)) minBLS=wo.bl_start;
