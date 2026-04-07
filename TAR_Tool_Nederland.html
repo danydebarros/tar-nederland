@@ -3283,30 +3283,39 @@ function ganttComputeSchedule(group) {
                          document.getElementById('gantt-exclude-scaffold').checked;
 
   wos.forEach(function(wo) {
-    // If excluding scaffold removal, recalculate plan_lh and bl_finish
-    // by removing scaffold removal activities from the WO
-    var planLH = wo.plan_lh;
-    var blFinish = wo.bl_finish;
-    if(excludeScaffold && ACTS_RAW && ACTS_RAW[wo.id]){
-      var filteredActs = ACTS_RAW[wo.id].filter(function(a){
+    // Get acts for this WO
+    var woActs = (ACTS_RAW && ACTS_RAW[wo.id]) ? ACTS_RAW[wo.id] : [];
+
+    // Filter out scaffold removal activities if toggle is on
+    var relevantActs = woActs;
+    if(excludeScaffold && woActs.length > 0){
+      relevantActs = woActs.filter(function(a){
         var name = (a[1]||'').toUpperCase();
         return !(name.indexOf('SCAFFOLD') >= 0 &&
                 (name.indexOf('REMOV') >= 0 || name.indexOf('DISMANTLE') >= 0 || name.indexOf('DEMOB') >= 0));
       });
-      if(filteredActs.length > 0){
-        planLH = filteredActs.reduce(function(s,a){return s+(a[2]||0);}, 0);
-        // Use latest finish of non-scaffold acts as the WO finish
-        var latestFinish = filteredActs.reduce(function(m,a){
-          var f = a[13] || (a[8]?a[8].substring(0,10):'');
-          return f > m ? f : m;
-        }, '');
-        if(latestFinish) blFinish = latestFinish;
-      }
+      if(relevantActs.length === 0) relevantActs = woActs; // don't exclude everything
     }
-    // Use plan hours to derive duration — more accurate than bl_finish - bl_start
-    // TAR runs 12h shifts; minimum 1 day
+
+    // Use the latest bl_finish across relevant acts as the WO forecast end
+    var blFinish = wo.bl_finish;
+    if(relevantActs.length > 0){
+      var latestActFinish = relevantActs.reduce(function(m,a){
+        var f = a[13] || (a[8]?a[8].substring(0,10):'');
+        return (f && f > m) ? f : m;
+      }, '');
+      if(latestActFinish) blFinish = latestActFinish;
+    }
+
+    // Duration = remaining (incomplete) act hours / 12h shift
+    // This gives forecast duration from today forward, not total plan
     var SHIFT_H = 12;
-    var dur = planLH ? Math.ceil(planLH / SHIFT_H) : ganttWorkDays(wo.bl_start, blFinish);
+    var remainingLH = relevantActs.reduce(function(s,a){
+      if((a[12]||'') === 'Complete') return s;
+      return s + (a[2]||0) * (1 - Math.min(1,(a[11]||0)/100));
+    }, 0);
+    var dur = remainingLH > 0 ? Math.ceil(remainingLH / SHIFT_H) : 
+              Math.ceil((wo.plan_lh||1) / SHIFT_H);
     if(dur < 1) dur = 1;
     var fStart, fFinish, pushed = false, notStarted = false;
     var woComplete = (wo.pct >= 100);
@@ -3318,6 +3327,10 @@ function ganttComputeSchedule(group) {
       // Has started — anchor to actual start, project finish by duration
       fStart  = actualStart;
       fFinish = ganttAddDays(fStart, dur);
+      // If in progress (not complete) and forecast finish is in the past, extend to today+1
+      if(!woComplete && fFinish < today) {
+        fFinish = ganttAddDays(today, 1);
+      }
 
     } else if (!woStarted && prevComplete) {
       // Not started, predecessor done — start from max(today, prevForecastFinish)
