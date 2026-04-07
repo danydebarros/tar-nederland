@@ -3277,15 +3277,16 @@ function ganttComputeSchedule(group) {
       fFinish = ganttAddDays(fStart, dur);
 
     } else if (!woStarted && prevComplete) {
-      // Not started, but predecessor is done — should start today
-      fStart  = today;
+      // Not started, predecessor done — start from max(today, prevForecastFinish)
+      fStart  = (prevForecastFinish && prevForecastFinish > today) ? prevForecastFinish : today;
       fFinish = ganttAddDays(fStart, dur);
       pushed  = fStart > wo.bl_start;
       notStarted = true;
 
     } else if (!woStarted && !prevComplete && prevForecastFinish) {
       // Not started, predecessor not done — start after predecessor finishes
-      fStart  = prevForecastFinish;
+      // but never go backwards (use max of predecessor finish and bl_start)
+      fStart  = prevForecastFinish > wo.bl_start ? prevForecastFinish : wo.bl_start;
       fFinish = ganttAddDays(fStart, dur);
       pushed  = fStart > wo.bl_start;
       notStarted = true;
