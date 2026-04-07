@@ -2892,6 +2892,27 @@ function renderGantt(){
   var cv    = document.getElementById('gantt-canvas');
   var wrap  = document.getElementById('gantt-chart-wrap');
   if(!cv||!wrap) return;
+
+  // If scaffold exclusion is on, patch ganttWOLookup bl_finish to exclude scaffold removal acts
+  var _excludeScaffold = document.getElementById('gantt-exclude-scaffold') &&
+                         document.getElementById('gantt-exclude-scaffold').checked;
+  GANTT_WO_DATA.forEach(function(wo){
+    if(!ACTS_RAW || !ACTS_RAW[wo.id]) return;
+    var allActs = ACTS_RAW[wo.id];
+    var useActs = _excludeScaffold ? allActs.filter(function(a){
+      var n=(a[1]||'').toUpperCase();
+      return !(n.indexOf('SCAFFOLD')>=0 &&
+              (n.indexOf('REMOV')>=0||n.indexOf('DISMANTLE')>=0||n.indexOf('DEMOB')>=0));
+    }) : allActs;
+    if(useActs.length === 0) useActs = allActs;
+    var latestFinish = useActs.reduce(function(m,a){
+      var f = a[13]||(a[8]?a[8].substring(0,10):'');
+      return (f&&f>m)?f:m;
+    },'');
+    if(latestFinish && ganttWOLookup[wo.id]){
+      ganttWOLookup[wo.id].bl_finish = latestFinish;
+    }
+  });
   var showWOs = document.getElementById('gantt-show-wos') && document.getElementById('gantt-show-wos').checked;
   var dpr   = window.devicePixelRatio||1;
   var cssW  = wrap.clientWidth||900;
