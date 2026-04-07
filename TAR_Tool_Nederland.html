@@ -858,14 +858,15 @@ function loadData(payload){
     wos.forEach(function(wo){
       wo.actual_lh = 0;
       (wo.acts||[]).forEach(function(a){
+        a.actual_lh = 0; // always zero first — live data is authoritative
         var live = actuals[a.id];
         if(live){
           a.actual_lh   = live.actual_lh || 0;
           a.pct         = live.pct || 0;
           a.status      = live.status || '';
-          a.start       = live.act_start || a.start;
+          if(live.act_start) a.start = live.act_start;
           if(live.act_finish) a.finish = live.act_finish;
-          if(live.early_finish) a.finish = live.act_finish || (live.early_finish+'T08:00');
+          else if(live.early_finish) a.finish = live.early_finish + 'T08:00';
           if(live.late_finish) a.late_finish = live.late_finish;
           if(live.fd !== null && live.fd !== undefined) a.fd = live.fd;
           if(live.res && live.res.length) a.res = live.res;
